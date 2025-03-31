@@ -40,11 +40,11 @@
 - **Backend:** Firebase / Supabase (for data management)  
 - **Database:** SQLite (local storage) or Firestore (cloud storage)  
 - **State Management:** Provider / Riverpod  
--->
+
 ---
 
 ## 🛠️ **Getting Started**
-
+-->
 ## 💡 **Future Enhancements**
 - AI-powered spending insights.  
 - Multi-currency support.  
