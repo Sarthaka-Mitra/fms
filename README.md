@@ -1,4 +1,3 @@
-# fms
 # **SpendWell – Finance Management System**
 
 **SpendWell** is a mobile app designed to help users efficiently manage their finances by tracking purchases, setting budgets, and analyzing spending patterns.
@@ -50,5 +49,3 @@
 - Multi-currency support.  
 - Secure data backup and sync across devices.  
 - Integration with external finance APIs for live expense tracking.  
-
----
