@@ -2,7 +2,7 @@ name: fms
 description: A new Flutter project.
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.7.2
@@ -25,10 +25,27 @@ dependencies:
   # provider: ^6.1.1
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.6
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^5.0.0
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "icon.png"
+
+flutter_native_splash:
+  color: "#8fffff"           # Background color of splash screen (change if you want)
+  image: "icon.png"     # Path to your new splash icon image
+  android: true
+  ios: true
+  android_gravity: center
+  ios_content_mode: scaleAspectFit
+  fullscreen: true
+
 
 flutter:
   uses-material-design: true

@@ -1,3 +1,4 @@
+import 'home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -11,6 +12,7 @@ class AnalysisViewBase extends StatefulWidget {
 }
 
 class _AnalysisViewBaseState extends State<AnalysisViewBase> {
+  bool isEditingMode = false;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -27,6 +29,7 @@ class _AnalysisViewBaseState extends State<AnalysisViewBase> {
     fetchOverviewData();
   }
 
+  // Fetching the data from Firestore
   Future<void> fetchOverviewData() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -59,6 +62,7 @@ class _AnalysisViewBaseState extends State<AnalysisViewBase> {
         }
 
         fetched.add({
+          'id': doc.id,
           'amount': amount,
           'type': type,
           'label': data['label'] ?? '',
@@ -90,6 +94,22 @@ class _AnalysisViewBaseState extends State<AnalysisViewBase> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios),
+          onPressed: () {
+            HomePage.setTab(0);
+          },
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(isEditingMode ? Icons.close : Icons.settings),
+            onPressed: () {
+              setState(() {
+                isEditingMode = !isEditingMode; // Toggle edit mode
+              });
+            },
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -125,24 +145,35 @@ class _AnalysisViewBaseState extends State<AnalysisViewBase> {
                 itemCount: transactions.length,
                 itemBuilder: (context, index) {
                   final tx = transactions[index];
-                  return ListTile(
-                    leading: Icon(Icons.category,
-                        color: tx['type'] == 'income'
-                            ? Colors.greenAccent
-                            : Colors.redAccent),
-                    title: Text(tx['label'],
-                        style: const TextStyle(color: Colors.white)),
-                    subtitle: Text(
-                      DateFormat('MMM dd, yyyy – hh:mm a')
-                          .format(tx['timestamp']),
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                    trailing: Text(
-                      '${tx['type'] == 'income' ? '+' : '-'}₹${tx['amount'].toStringAsFixed(2)}',
-                      style: TextStyle(
+
+                  return GestureDetector(
+                    child: Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      color: const Color(0xFF1C1C2E),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.category,
                           color: tx['type'] == 'income'
                               ? Colors.greenAccent
-                              : Colors.redAccent),
+                              : Colors.redAccent,
+                        ),
+                        title: Text(
+                          tx['label'],
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          DateFormat('MMM dd, yyyy – hh:mm a').format(tx['timestamp']),
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        trailing: Text(
+                          '${tx['type'] == 'income' ? '+' : '-'}₹${tx['amount'].toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: tx['type'] == 'income'
+                                ? Colors.greenAccent
+                                : Colors.redAccent,
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -164,15 +195,15 @@ class _AnalysisViewBaseState extends State<AnalysisViewBase> {
         ),
         child: Column(
           children: [
-            Text(title,
-                style: const TextStyle(
-                    color: Colors.white70, fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            Text(value,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
       ),

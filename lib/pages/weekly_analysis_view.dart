@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'editTransaction.dart';
 
 class WeeklyAnalysisView extends StatefulWidget {
   const WeeklyAnalysisView({super.key});
@@ -17,6 +18,8 @@ class _WeeklyAnalysisViewState extends State<WeeklyAnalysisView> {
   double income = 0.0;
   double expense = 0.0;
   List<Map<String, dynamic>> transactions = [];
+
+  Set<String> expandedTransactions = {};
 
   @override
   void initState() {
@@ -65,6 +68,7 @@ class _WeeklyAnalysisViewState extends State<WeeklyAnalysisView> {
         }
 
         weeklyTransactions.add({
+          'id': doc.id,
           'category': category,
           'amount': amount,
           'timestamp': date,
@@ -82,6 +86,66 @@ class _WeeklyAnalysisViewState extends State<WeeklyAnalysisView> {
       print('Error loading weekly data: $e');
     }
   }
+
+  Future<void> _deleteTransaction(Map<String, dynamic> tx) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final docId = tx['docId'] ?? tx['id']; // use the added 'docId' or fallback to 'id'
+      if (docId == null) {
+        print('No docId found for this transaction');
+        return;
+      }
+
+      await _firestore.collection('transactions').doc(docId).delete();
+
+      setState(() {
+        transactions.remove(tx);
+        if (tx['type'] == 'income') {
+          income -= tx['amount'];
+        } else {
+          expense -= tx['amount'];
+        }
+      });
+    } catch (e) {
+      print('Error deleting transaction: $e');
+    }
+  }
+
+  void _toggleExpanded(String id) {
+    setState(() {
+      if (expandedTransactions.contains(id)) {
+        expandedTransactions.remove(id);
+      } else {
+        expandedTransactions.add(id);
+      }
+    });
+  }
+
+  void _editTransaction(Map<String, dynamic> tx) async {
+    final result = await Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        pageBuilder: (_, __, ___) => EditTransactionOverlay(transaction: tx),
+      ),
+    );
+
+    if (result == true) {
+      // Reload weekly data after editing
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _loadData(user.uid);
+      }
+
+      //If you have no isEditingMode variable, just remove this:
+      setState(() {
+        expandedTransactions.remove(tx['id']);
+      });
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +188,7 @@ class _WeeklyAnalysisViewState extends State<WeeklyAnalysisView> {
                 itemCount: transactions.length,
                 itemBuilder: (context, index) {
                   final tx = transactions[index];
+                  final isExpanded = expandedTransactions.contains(tx['id']);
                   return Container(
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     padding: const EdgeInsets.all(12),
@@ -134,29 +199,58 @@ class _WeeklyAnalysisViewState extends State<WeeklyAnalysisView> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(tx['label'],
+                        // Label & Date wrapped in GestureDetector to collapse if expanded
+                        GestureDetector(
+                          onTap: () {
+                            if (isExpanded) {
+                              setState(() {
+                                expandedTransactions.remove(tx['id']);
+                              });
+                            }
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(tx['label'],
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 16)),
+                              const SizedBox(height: 4),
+                              Text(
+                                DateFormat('EEE, MMM d').format(tx['timestamp']),
                                 style: const TextStyle(
-                                    color: Colors.white, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            Text(
-                              DateFormat('EEE, MMM d')
-                                  .format(tx['timestamp']),
-                              style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12),
+                                    color: Colors.white54, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Expanded actions or amount toggle
+                        isExpanded
+                            ? Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit,
+                                  size: 18, color: Colors.white),
+                              onPressed: () => _editTransaction(tx),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete,
+                                  color: Colors.redAccent, size: 20),
+                              onPressed: () => _deleteTransaction(tx),
                             ),
                           ],
-                        ),
-                        Text(
-                          '${tx['type'] == 'income' ? '+' : '-'}₹${tx['amount'].toStringAsFixed(2)}',
-                          style: TextStyle(
-                              color: tx['type'] == 'income'
-                                  ? Colors.greenAccent
-                                  : Colors.redAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16),
+                        )
+                            : GestureDetector(
+                          onTap: () => _toggleExpanded(tx['id']),
+                          child: Text(
+                            '${tx['type'] == 'income' ? '+' : '-'}₹${tx['amount'].toStringAsFixed(2)}',
+                            style: TextStyle(
+                                color: tx['type'] == 'income'
+                                    ? Colors.greenAccent
+                                    : Colors.redAccent,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16),
+                          ),
                         ),
                       ],
                     ),

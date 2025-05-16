@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'editTransaction.dart';
 
 class DailyAnalysisView extends StatefulWidget {
   const DailyAnalysisView({super.key});
@@ -17,6 +18,8 @@ class _DailyAnalysisViewState extends State<DailyAnalysisView> {
   double income = 0.0;
   double expense = 0.0;
   List<Map<String, dynamic>> transactions = [];
+
+  Set<String> expandedTransactions = {};
 
   @override
   void initState() {
@@ -65,6 +68,7 @@ class _DailyAnalysisViewState extends State<DailyAnalysisView> {
         }
 
         dailyTransactions.add({
+          'id': doc.id, // Added doc id for edit/delete
           'category': category,
           'amount': amount,
           'timestamp': date,
@@ -80,6 +84,62 @@ class _DailyAnalysisViewState extends State<DailyAnalysisView> {
       });
     } catch (e) {
       print('Error loading daily data: $e');
+    }
+  }
+
+  Future<void> _deleteTransaction(Map<String, dynamic> tx) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final docId = tx['id'];
+      if (docId == null) {
+        print('No docId found for this transaction');
+        return;
+      }
+
+      await _firestore.collection('transactions').doc(docId).delete();
+
+      setState(() {
+        transactions.remove(tx);
+        if (tx['type'] == 'income') {
+          income -= tx['amount'];
+        } else {
+          expense -= tx['amount'];
+        }
+        expandedTransactions.remove(docId);
+      });
+    } catch (e) {
+      print('Error deleting transaction: $e');
+    }
+  }
+
+  void _toggleExpanded(String id) {
+    setState(() {
+      if (expandedTransactions.contains(id)) {
+        expandedTransactions.remove(id);
+      } else {
+        expandedTransactions.add(id);
+      }
+    });
+  }
+
+  void _editTransaction(Map<String, dynamic> tx) async {
+    final result = await Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        pageBuilder: (_, __, ___) => EditTransactionOverlay(transaction: tx),
+      ),
+    );
+
+    if (result == true) {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _loadData(user.uid);
+      }
+      setState(() {
+        expandedTransactions.remove(tx['id']);
+      });
     }
   }
 
@@ -124,6 +184,8 @@ class _DailyAnalysisViewState extends State<DailyAnalysisView> {
                 itemCount: transactions.length,
                 itemBuilder: (context, index) {
                   final tx = transactions[index];
+                  final isExpanded =
+                  expandedTransactions.contains(tx['id']);
                   return Container(
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     padding: const EdgeInsets.all(12),
@@ -134,29 +196,59 @@ class _DailyAnalysisViewState extends State<DailyAnalysisView> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(tx['label'],
+                        GestureDetector(
+                          onTap: () {
+                            if (isExpanded) {
+                              setState(() {
+                                expandedTransactions.remove(tx['id']);
+                              });
+                            }
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(tx['label'],
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 16)),
+                              const SizedBox(height: 4),
+                              Text(
+                                DateFormat('MMM d, yyyy')
+                                    .format(tx['timestamp']),
                                 style: const TextStyle(
-                                    color: Colors.white, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            Text(
-                              DateFormat('MMM d, yyyy')
-                                  .format(tx['timestamp']),
-                              style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12),
+                                    color: Colors.white54, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Expanded actions or amount toggle
+                        isExpanded
+                            ? Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit,
+                                  size: 18, color: Colors.white),
+                              onPressed: () => _editTransaction(tx),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete,
+                                  color: Colors.redAccent, size: 20),
+                              onPressed: () =>
+                                  _deleteTransaction(tx),
                             ),
                           ],
-                        ),
-                        Text(
-                          '${tx['type'] == 'income' ? '+' : '-'}₹${tx['amount'].toStringAsFixed(2)}',
-                          style: TextStyle(
-                              color: tx['type'] == 'income'
-                                  ? Colors.greenAccent
-                                  : Colors.redAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16),
+                        )
+                            : GestureDetector(
+                          onTap: () => _toggleExpanded(tx['id']),
+                          child: Text(
+                            '${tx['type'] == 'income' ? '+' : '-'}₹${tx['amount'].toStringAsFixed(2)}',
+                            style: TextStyle(
+                                color: tx['type'] == 'income'
+                                    ? Colors.greenAccent
+                                    : Colors.redAccent,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16),
+                          ),
                         ),
                       ],
                     ),
